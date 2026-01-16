@@ -1,11 +1,13 @@
 import Contact from '../models/Contact.js';
+import { sendEmail } from '../config/email.js';
+import { getContactMessageTemplate } from '../utils/emailTemplates.js';
 
 export const createContact = async (req, res) => {
     try {
-        const { name, email, phone, message } = req.body;
+        const { name, email, subject, message } = req.body;
 
         // Validate required fields
-        if (!name || !email || !phone || !message) {
+        if (!name || !email || !subject || !message) {
             return res.status(400).json({
                 success: false,
                 message: 'All fields are required'
@@ -16,11 +18,26 @@ export const createContact = async (req, res) => {
         const contact = new Contact({
             name,
             email,
-            phone,
+            subject,
             message
         });
 
         await contact.save();
+
+        // Send Email Notification to Admin
+        const emailHtml = getContactMessageTemplate({
+            name,
+            email,
+            subject,
+            message
+        });
+
+        await sendEmail({
+            to: process.env.EMAIL_USER, // Send to site owner
+            replyTo: email, // Reply goes to the user
+            subject: `New Message from ${name} - Photoshopy Contact`,
+            html: emailHtml
+        });
 
         res.status(201).json({
             success: true,

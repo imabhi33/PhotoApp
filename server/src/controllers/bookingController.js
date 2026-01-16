@@ -1,4 +1,10 @@
 import Booking from '../models/Booking.js';
+import { sendEmail } from '../config/email.js';
+import {
+    getInquiryReceivedTemplate,
+    getBookingConfirmedTemplate,
+    getBookingDeclinedTemplate
+} from '../utils/emailTemplates.js';
 
 export const createBooking = async (req, res) => {
     try {
@@ -24,6 +30,20 @@ export const createBooking = async (req, res) => {
         });
 
         await booking.save();
+
+        // Send Auto-Reply Email
+        const emailHtml = getInquiryReceivedTemplate({
+            name,
+            eventType,
+            eventDate,
+            location
+        });
+
+        await sendEmail({
+            to: email,
+            subject: `Thank you for your inquiry: ${eventType} Photography`,
+            html: emailHtml
+        });
 
         res.status(201).json({
             success: true,
@@ -87,6 +107,35 @@ export const updateBookingStatus = async (req, res) => {
             message: 'Booking status updated successfully',
             data: booking
         });
+
+        // Send Status Update Email
+        let emailHtml = null;
+        let subject = '';
+
+        if (status === 'confirmed') {
+            emailHtml = getBookingConfirmedTemplate({
+                name: booking.name,
+                eventType: booking.eventType,
+                eventDate: booking.eventDate,
+                location: booking.location
+            });
+            subject = 'Booking Confirmed! - Photoshopy';
+        } else if (status === 'cancelled') {
+            emailHtml = getBookingDeclinedTemplate({
+                name: booking.name,
+                eventType: booking.eventType,
+                eventDate: booking.eventDate
+            });
+            subject = 'Update regarding your booking request - Photoshopy';
+        }
+
+        if (emailHtml) {
+            await sendEmail({
+                to: booking.email,
+                subject,
+                html: emailHtml
+            });
+        }
     } catch (error) {
         console.error('Error updating booking:', error);
         res.status(500).json({
